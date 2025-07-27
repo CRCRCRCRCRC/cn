@@ -307,5 +307,8 @@ def run_analysis(task_id, model, user_id):
         tasks[task_id]['error'] = str(e)
         # 任務失敗，不扣除積分
 
+# Vercel 需要的應用實例
+application = app
+
 if __name__ == '__main__':
     app.run(debug=True)
