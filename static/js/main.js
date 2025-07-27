@@ -119,9 +119,9 @@ class ThreatAnalysisSystem {
             // 更新積分顯示
             this.updateCredits(data.remaining_credits);
             
-            // 開始輪詢任務狀態
+            // 檢查任務狀態
             this.currentTask = data.task_id;
-            this.startPolling();
+            this.checkTaskStatus();
             
         } catch (error) {
             this.hideLoading();
@@ -129,53 +129,46 @@ class ThreatAnalysisSystem {
         }
     }
 
-    startPolling() {
-        if (this.pollInterval) {
-            clearInterval(this.pollInterval);
-        }
-
-        this.pollInterval = setInterval(async () => {
-            try {
-                const response = await fetch(`/get_report/${this.currentTask}`);
-                
-                // 檢查響應是否為 JSON
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    throw new Error('伺服器返回非 JSON 響應，可能需要重新登入');
-                }
-                
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.error || '獲取報告失敗');
-                }
-
-                // 更新進度
-                this.updateProgress(data.progress);
-
-                if (data.status === 'completed') {
-                    this.handleAnalysisComplete(data.result);
-                } else if (data.status === 'error') {
-                    throw new Error(data.error || '分析過程發生錯誤');
-                }
-
-            } catch (error) {
-                this.stopPolling();
-                this.hideLoading();
-                this.showError(error.message);
+    async checkTaskStatus() {
+        try {
+            const response = await fetch(`/get_report/${this.currentTask}`);
+            
+            // 檢查響應是否為 JSON
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                throw new Error('伺服器返回非 JSON 響應，可能需要重新登入');
             }
-        }, 2000); // 每2秒檢查一次
-    }
+            
+            const data = await response.json();
 
-    stopPolling() {
-        if (this.pollInterval) {
-            clearInterval(this.pollInterval);
-            this.pollInterval = null;
+            if (!response.ok) {
+                throw new Error(data.error || '獲取報告失敗');
+            }
+
+            // 更新進度
+            this.updateProgress(data.progress);
+
+            if (data.status === 'completed') {
+                this.handleAnalysisComplete(data.result);
+                // 更新積分顯示
+                if (data.final_credits !== undefined) {
+                    this.updateCredits(data.final_credits);
+                }
+            } else if (data.status === 'error') {
+                throw new Error(data.error || '分析過程發生錯誤');
+            } else {
+                // 如果還在進行中，繼續檢查
+                setTimeout(() => this.checkTaskStatus(), 1000);
+            }
+
+        } catch (error) {
+            this.hideLoading();
+            this.showError(error.message);
         }
     }
+
 
     handleAnalysisComplete(result) {
-        this.stopPolling();
         this.hideLoading();
         
         // 顯示儀表板

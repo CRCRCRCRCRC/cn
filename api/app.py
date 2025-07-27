@@ -61,12 +61,19 @@ class User(UserMixin):
             return True
         if self.credits >= amount:
             self.credits -= amount
-            # 更新 session 中的積分
+            return True
+        return False
+    
+    def update_session_credits(self):
+        """更新 session 中的積分（只在有 request context 時調用）"""
+        try:
+            from flask import session
             if 'user_data' in session:
                 session['user_data']['credits'] = self.credits
                 session.modified = True
-            return True
-        return False
+        except RuntimeError:
+            # 沒有 request context 時忽略
+            pass
 
 # 全域變量存儲用戶和任務
 users = {}
@@ -242,14 +249,16 @@ def start_analysis():
             'credits_deducted': False
         }
         
-        # 背景執行分析
-        thread = threading.Thread(target=run_analysis, args=(task_id, model, current_user.id))
-        thread.start()
+        # 在 Serverless 環境中直接執行，不使用背景線程
+        # 因為 Vercel 的 Serverless 函數有時間限制，我們改為同步執行
+        try:
+            run_analysis_sync(task_id, model, current_user.id)
+        except Exception as e:
+            tasks[task_id]['status'] = 'error'
+            tasks[task_id]['error'] = str(e)
         
         # 確保返回最新的積分數
-        if 'user_data' in session:
-            session['user_data']['credits'] = current_user.credits
-            session.modified = True
+        current_user.update_session_credits()
         
         return jsonify({'task_id': task_id, 'remaining_credits': current_user.credits})
     
@@ -264,13 +273,20 @@ def get_report(task_id):
         if not task or task['user_id'] != current_user.id:
             return jsonify({'error': '任務不存在'}), 404
         
+        # 如果任務完成且積分已扣除，更新當前用戶的積分
+        if (task.get('status') == 'completed' and 
+            task.get('credits_deducted') and 
+            'final_credits' in task):
+            current_user.credits = task['final_credits']
+            current_user.update_session_credits()
+        
         return jsonify(task)
     
     except Exception as e:
         return jsonify({'error': f'獲取報告失敗: {str(e)}'}), 500
 
-def run_analysis(task_id, model, user_id):
-    """背景執行分析任務"""
+def run_analysis_sync(task_id, model, user_id):
+    """同步執行分析任務（適用於 Serverless 環境）"""
     try:
         # 更新進度
         tasks[task_id]['progress'] = 10
@@ -293,6 +309,7 @@ def run_analysis(task_id, model, user_id):
             cost = tasks[task_id]['cost']
             user.deduct_credits(cost)
             tasks[task_id]['credits_deducted'] = True
+            tasks[task_id]['final_credits'] = user.credits
         
         # 完成任務
         tasks[task_id]['status'] = 'completed'
@@ -306,6 +323,7 @@ def run_analysis(task_id, model, user_id):
         tasks[task_id]['status'] = 'error'
         tasks[task_id]['error'] = str(e)
         # 任務失敗，不扣除積分
+        raise e  # 重新拋出異常以便上層處理
 
 # Vercel 需要的應用實例
 application = app
