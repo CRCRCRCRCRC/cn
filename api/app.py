@@ -61,6 +61,10 @@ class User(UserMixin):
             return True
         if self.credits >= amount:
             self.credits -= amount
+            # 更新 session 中的積分
+            if 'user_data' in session:
+                session['user_data']['credits'] = self.credits
+                session.modified = True
             return True
         return False
 
@@ -70,6 +74,20 @@ tasks = {}
 
 @login_manager.user_loader
 def load_user(user_id):
+    # 在 Serverless 環境中，先嘗試從 session 恢復用戶
+    if user_id not in users and 'user_data' in session:
+        user_data = session['user_data']
+        if user_data['id'] == user_id:
+            user = User(
+                user_data['id'],
+                user_data['email'],
+                user_data['name'],
+                user_data['picture'],
+                user_data.get('is_dev', False)
+            )
+            user.credits = user_data.get('credits', user.credits)
+            users[user_id] = user
+    
     return users.get(user_id)
 
 # AI 模型配置
@@ -100,6 +118,17 @@ def dev_auth():
             # 創建開發者用戶
             dev_user = User('dev_user', 'dev@taiwan-defense.com', '開發團隊', '', is_dev=True)
             users['dev_user'] = dev_user
+            
+            # 保存到 session
+            session['user_data'] = {
+                'id': dev_user.id,
+                'email': dev_user.email,
+                'name': dev_user.name,
+                'picture': dev_user.picture,
+                'is_dev': dev_user.is_dev,
+                'credits': dev_user.credits
+            }
+            
             login_user(dev_user)
             return redirect(url_for('index'))
         else:
@@ -155,6 +184,17 @@ def google_callback():
             user_info.get('picture', '')
         )
         users[user_info['id']] = user
+        
+        # 保存到 session
+        session['user_data'] = {
+            'id': user.id,
+            'email': user.email,
+            'name': user.name,
+            'picture': user.picture,
+            'is_dev': user.is_dev,
+            'credits': user.credits
+        }
+        
         login_user(user)
         
         return redirect(url_for('index'))
@@ -166,6 +206,8 @@ def google_callback():
 @login_required
 def logout():
     logout_user()
+    # 清除 session 中的用戶數據
+    session.pop('user_data', None)
     return redirect(url_for('index'))
 
 @app.route('/start_analysis', methods=['POST'])
@@ -183,8 +225,8 @@ def start_analysis():
         
         cost = AI_MODELS[model]
         
-        # 檢查積分
-        if not current_user.deduct_credits(cost):
+        # 檢查積分（但先不扣除）
+        if not current_user.is_dev and current_user.credits < cost:
             return jsonify({'error': '積分不足'}), 400
         
         # 創建任務
@@ -195,12 +237,19 @@ def start_analysis():
             'result': None,
             'error': None,
             'user_id': current_user.id,
-            'model': model
+            'model': model,
+            'cost': cost,
+            'credits_deducted': False
         }
         
         # 背景執行分析
-        thread = threading.Thread(target=run_analysis, args=(task_id, model))
+        thread = threading.Thread(target=run_analysis, args=(task_id, model, current_user.id))
         thread.start()
+        
+        # 確保返回最新的積分數
+        if 'user_data' in session:
+            session['user_data']['credits'] = current_user.credits
+            session.modified = True
         
         return jsonify({'task_id': task_id, 'remaining_credits': current_user.credits})
     
@@ -220,7 +269,7 @@ def get_report(task_id):
     except Exception as e:
         return jsonify({'error': f'獲取報告失敗: {str(e)}'}), 500
 
-def run_analysis(task_id, model):
+def run_analysis(task_id, model, user_id):
     """背景執行分析任務"""
     try:
         # 更新進度
@@ -238,6 +287,13 @@ def run_analysis(task_id, model):
         report = generate_ai_report(data, indicators, model)
         tasks[task_id]['progress'] = 100
         
+        # 任務成功完成，現在才扣除積分
+        user = users.get(user_id)
+        if user and not user.is_dev:
+            cost = tasks[task_id]['cost']
+            user.deduct_credits(cost)
+            tasks[task_id]['credits_deducted'] = True
+        
         # 完成任務
         tasks[task_id]['status'] = 'completed'
         tasks[task_id]['result'] = {
@@ -249,6 +305,7 @@ def run_analysis(task_id, model):
     except Exception as e:
         tasks[task_id]['status'] = 'error'
         tasks[task_id]['error'] = str(e)
+        # 任務失敗，不扣除積分
 
 if __name__ == '__main__':
     app.run(debug=True)
