@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>開發者驗證 - 台灣防衛情勢感知系統</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="cyber-background"></div>
+    <div class="scan-lines"></div>
+    
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <i class="fas fa-code"></i>
+                <h1>開發者驗證</h1>
+                <p>請輸入測試碼</p>
+            </div>
+            
+            <div class="login-content">
+                {% with messages = get_flashed_messages() %}
+                    {% if messages %}
+                        <div class="alert alert-error">
+                            {% for message in messages %}
+                                <p>{{ message }}</p>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+                
+                <form method="POST" class="dev-form">
+                    <div class="form-group">
+                        <label for="test_code">測試碼：</label>
+                        <input type="password" id="test_code" name="test_code" class="cyber-input" placeholder="請輸入測試碼" required>
+                    </div>
+                    
+                    <button type="submit" class="cyber-button primary">
+                        <i class="fas fa-key"></i>
+                        驗證
+                    </button>
+                </form>
+                
+                <div class="login-footer">
+                    <a href="{{ url_for('login') }}" class="back-link">
+                        <i class="fas fa-arrow-left"></i>
+                        返回登入
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

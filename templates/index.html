@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台灣防衛情勢感知系統</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="cyber-background"></div>
+    <div class="scan-lines"></div>
+    
+    <header class="header">
+        <div class="container">
+            <div class="logo">
+                <i class="fas fa-shield-alt"></i>
+                <span>台灣防衛情勢感知系統</span>
+            </div>
+            
+            {% if user %}
+            <div class="user-info">
+                <img src="{{ user.picture or url_for('static', filename='img/default-avatar.svg') }}" alt="用戶頭像" class="user-avatar">
+                <span class="user-name">{{ user.name }}</span>
+                <span class="credits-info">
+                    剩餘 <span id="credits-count">{{ user.credits }}</span>/{{ '∞' if user.is_dev else '1000' }} 積分
+                </span>
+                <a href="{{ url_for('logout') }}" class="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i>
+                </a>
+            </div>
+            {% else %}
+            <div class="auth-buttons">
+                <a href="{{ url_for('login') }}" class="login-btn">登入系統</a>
+            </div>
+            {% endif %}
+        </div>
+    </header>
+
+    <main class="main-content">
+        <div class="container">
+            {% if user %}
+            <!-- 已登入用戶的主要介面 -->
+            <div class="control-panel">
+                <h1 class="main-title">
+                    <i class="fas fa-radar"></i>
+                    即時威脅分析
+                </h1>
+                
+                <div class="analysis-controls">
+                    <div class="model-selector">
+                        <label for="ai-model">選擇AI模型：</label>
+                        <select id="ai-model" class="cyber-select">
+                            {% for model, cost in ai_models.items() %}
+                            <option value="{{ model }}" data-cost="{{ cost }}">
+                                {{ model }} ({{ cost }} 積分)
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <button id="start-analysis" class="cyber-button primary">
+                        <i class="fas fa-play"></i>
+                        開始分析
+                    </button>
+                </div>
+            </div>
+
+            <!-- 威脅指標儀表板 -->
+            <div class="dashboard" id="dashboard" style="display: none;">
+                <div class="threat-indicators">
+                    <div class="indicator-card">
+                        <h3><i class="fas fa-fighter-jet"></i> 軍事威脅</h3>
+                        <div class="circular-progress" data-indicator="military">
+                            <div class="progress-circle">
+                                <div class="progress-fill"></div>
+                                <div class="progress-text">0%</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="indicator-card">
+                        <h3><i class="fas fa-chart-line"></i> 經濟壓力</h3>
+                        <div class="circular-progress" data-indicator="economic">
+                            <div class="progress-circle">
+                                <div class="progress-fill"></div>
+                                <div class="progress-text">0%</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="indicator-card">
+                        <h3><i class="fas fa-newspaper"></i> 新聞示警</h3>
+                        <div class="circular-progress" data-indicator="news">
+                            <div class="progress-circle">
+                                <div class="progress-fill"></div>
+                                <div class="progress-text">0%</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 綜合威脅機率 -->
+                <div class="overall-threat">
+                    <h2>綜合威脅機率</h2>
+                    <div class="threat-meter">
+                        <div class="meter-background">
+                            <div class="meter-fill" id="overall-meter"></div>
+                        </div>
+                        <div class="threat-percentage" id="overall-percentage">0%</div>
+                    </div>
+                </div>
+
+                <!-- 近三個月攻台機率 -->
+                <div class="monthly-probabilities">
+                    <h3>近三個月攻台機率</h3>
+                    <div class="month-cards">
+                        <div class="month-card">
+                            <div class="month-label">第一個月</div>
+                            <div class="month-percentage" id="month1-prob">0%</div>
+                        </div>
+                        <div class="month-card">
+                            <div class="month-label">第二個月</div>
+                            <div class="month-percentage" id="month2-prob">0%</div>
+                        </div>
+                        <div class="month-card">
+                            <div class="month-label">第三個月</div>
+                            <div class="month-percentage" id="month3-prob">0%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI分析報告 -->
+            <div class="report-section" id="report-section" style="display: none;">
+                <h2><i class="fas fa-robot"></i> AI綜合分析報告</h2>
+                <div class="report-content" id="report-content">
+                    <!-- 報告內容將通過JavaScript插入 -->
+                </div>
+            </div>
+
+            <!-- 載入動畫 -->
+            <div class="loading-overlay" id="loading-overlay" style="display: none;">
+                <div class="loading-content">
+                    <div class="cyber-loader"></div>
+                    <div class="loading-text">正在分析威脅情勢...</div>
+                    <div class="loading-progress">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="loading-progress-fill"></div>
+                        </div>
+                        <div class="progress-text" id="loading-progress-text">0%</div>
+                    </div>
+                </div>
+            </div>
+
+            {% else %}
+            <!-- 未登入用戶的歡迎介面 -->
+            <div class="welcome-section">
+                <h1 class="welcome-title">
+                    <i class="fas fa-shield-alt"></i>
+                    台灣防衛情勢感知系統
+                </h1>
+                <p class="welcome-description">
+                    即時蒐集多源情報，量化威脅並產生AI綜合分析報告
+                </p>
+                
+                <div class="features">
+                    <div class="feature-card">
+                        <i class="fas fa-satellite-dish"></i>
+                        <h3>多源情報收集</h3>
+                        <p>整合軍事動態、新聞輿情、經濟指標等多維度資料</p>
+                    </div>
+                    <div class="feature-card">
+                        <i class="fas fa-brain"></i>
+                        <h3>AI智能分析</h3>
+                        <p>運用先進AI模型進行深度分析和威脅評估</p>
+                    </div>
+                    <div class="feature-card">
+                        <i class="fas fa-chart-area"></i>
+                        <h3>即時視覺化</h3>
+                        <p>賽博龐克風格儀表板，直觀呈現威脅態勢</p>
+                    </div>
+                </div>
+                
+                <button id="start-demo" class="cyber-button primary large">
+                    <i class="fas fa-rocket"></i>
+                    開始分析
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </main>
+
+    <!-- 登入提醒彈窗 -->
+    <div class="modal" id="login-modal" style="display: none;">
+        <div class="modal-content">
+            <h3><i class="fas fa-exclamation-triangle"></i> 需要登入</h3>
+            <p>請登入後再使用分析功能！</p>
+            <div class="modal-buttons">
+                <button class="cyber-button secondary" onclick="closeModal()">取消</button>
+                <a href="{{ url_for('login') }}" class="cyber-button primary">前往登入</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

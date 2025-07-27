@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登入 - 台灣防衛情勢感知系統</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="cyber-background"></div>
+    <div class="scan-lines"></div>
+    
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <i class="fas fa-shield-alt"></i>
+                <h1>系統登入</h1>
+                <p>台灣防衛情勢感知系統</p>
+            </div>
+            
+            <div class="login-content">
+                {% with messages = get_flashed_messages() %}
+                    {% if messages %}
+                        <div class="alert alert-error">
+                            {% for message in messages %}
+                                <p>{{ message }}</p>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+                
+                <a href="{{ url_for('google_auth') }}" class="google-login-btn">
+                    <i class="fab fa-google"></i>
+                    使用 Google 登入
+                </a>
+                
+                <div class="login-footer">
+                    <a href="{{ url_for('dev_auth') }}" class="dev-link">是開發團隊嗎？</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
