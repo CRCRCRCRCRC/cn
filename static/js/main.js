@@ -104,6 +104,12 @@ class ThreatAnalysisSystem {
                 })
             });
 
+            // 檢查響應是否為 JSON
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                throw new Error('伺服器返回非 JSON 響應，可能需要重新登入');
+            }
+
             const data = await response.json();
             
             if (!response.ok) {
@@ -131,6 +137,13 @@ class ThreatAnalysisSystem {
         this.pollInterval = setInterval(async () => {
             try {
                 const response = await fetch(`/get_report/${this.currentTask}`);
+                
+                // 檢查響應是否為 JSON
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    throw new Error('伺服器返回非 JSON 響應，可能需要重新登入');
+                }
+                
                 const data = await response.json();
 
                 if (!response.ok) {

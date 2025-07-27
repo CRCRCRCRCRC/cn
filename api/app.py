@@ -35,6 +35,13 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
+# 自定義未授權處理器，返回 JSON 而不是重定向
+@login_manager.unauthorized_handler
+def unauthorized():
+    if request.is_json or request.path.startswith('/start_analysis') or request.path.startswith('/get_report'):
+        return jsonify({'error': '請先登入系統'}), 401
+    return redirect(url_for('login'))
+
 # 用戶類別
 class User(UserMixin):
     def __init__(self, id, email, name, picture, is_dev=False):
@@ -164,42 +171,54 @@ def logout():
 @app.route('/start_analysis', methods=['POST'])
 @login_required
 def start_analysis():
-    model = request.json.get('model', 'gpt-4.1-nano-2025-04-14')
+    try:
+        # 確保請求包含 JSON 數據
+        if not request.is_json:
+            return jsonify({'error': '請求必須包含 JSON 數據'}), 400
+        
+        model = request.json.get('model', 'gpt-4.1-nano-2025-04-14')
+        
+        if model not in AI_MODELS:
+            return jsonify({'error': '無效的AI模型'}), 400
+        
+        cost = AI_MODELS[model]
+        
+        # 檢查積分
+        if not current_user.deduct_credits(cost):
+            return jsonify({'error': '積分不足'}), 400
+        
+        # 創建任務
+        task_id = f"task_{int(time.time())}"
+        tasks[task_id] = {
+            'status': 'running',
+            'progress': 0,
+            'result': None,
+            'error': None,
+            'user_id': current_user.id,
+            'model': model
+        }
+        
+        # 背景執行分析
+        thread = threading.Thread(target=run_analysis, args=(task_id, model))
+        thread.start()
+        
+        return jsonify({'task_id': task_id, 'remaining_credits': current_user.credits})
     
-    if model not in AI_MODELS:
-        return jsonify({'error': '無效的AI模型'}), 400
-    
-    cost = AI_MODELS[model]
-    
-    # 檢查積分
-    if not current_user.deduct_credits(cost):
-        return jsonify({'error': '積分不足'}), 400
-    
-    # 創建任務
-    task_id = f"task_{int(time.time())}"
-    tasks[task_id] = {
-        'status': 'running',
-        'progress': 0,
-        'result': None,
-        'error': None,
-        'user_id': current_user.id,
-        'model': model
-    }
-    
-    # 背景執行分析
-    thread = threading.Thread(target=run_analysis, args=(task_id, model))
-    thread.start()
-    
-    return jsonify({'task_id': task_id, 'remaining_credits': current_user.credits})
+    except Exception as e:
+        return jsonify({'error': f'分析啟動失敗: {str(e)}'}), 500
 
 @app.route('/get_report/<task_id>')
 @login_required
 def get_report(task_id):
-    task = tasks.get(task_id)
-    if not task or task['user_id'] != current_user.id:
-        return jsonify({'error': '任務不存在'}), 404
+    try:
+        task = tasks.get(task_id)
+        if not task or task['user_id'] != current_user.id:
+            return jsonify({'error': '任務不存在'}), 404
+        
+        return jsonify(task)
     
-    return jsonify(task)
+    except Exception as e:
+        return jsonify({'error': f'獲取報告失敗: {str(e)}'}), 500
 
 def run_analysis(task_id, model):
     """背景執行分析任務"""
