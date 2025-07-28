@@ -149,3 +149,5 @@ Thumbs.db
 temp/
 tmp/
 .vercel
+
+gitpush.bat

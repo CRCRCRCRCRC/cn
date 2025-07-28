@@ -119,9 +119,20 @@ class ThreatAnalysisSystem {
             // 更新積分顯示
             this.updateCredits(data.remaining_credits);
             
-            // 檢查任務狀態
-            this.currentTask = data.task_id;
-            this.checkTaskStatus();
+            // 檢查是否已經完成（同步執行）
+            if (data.status === 'completed' && data.result) {
+                // 直接處理完成的結果
+                this.handleAnalysisComplete(data.result);
+                
+                // 更新最終積分
+                if (data.remaining_credits !== undefined) {
+                    this.updateCredits(data.remaining_credits);
+                }
+            } else {
+                // 如果還需要檢查狀態（備用方案）
+                this.currentTask = data.task_id;
+                this.checkTaskStatus();
+            }
             
         } catch (error) {
             this.hideLoading();
@@ -142,6 +153,12 @@ class ThreatAnalysisSystem {
             const data = await response.json();
 
             if (!response.ok) {
+                // 如果是 404 錯誤，說明報告已經在主請求中返回了
+                if (response.status === 404) {
+                    this.hideLoading();
+                    this.showError('分析系統已改為同步執行，報告應該已經顯示。如果沒有看到結果，請重新開始分析。');
+                    return;
+                }
                 throw new Error(data.error || '獲取報告失敗');
             }
 
