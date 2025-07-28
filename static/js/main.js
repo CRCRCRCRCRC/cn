@@ -2,8 +2,6 @@
 
 class ThreatAnalysisSystem {
     constructor() {
-        this.currentTask = null;
-        this.pollInterval = null;
         this.init();
     }
 
@@ -93,7 +91,7 @@ class ThreatAnalysisSystem {
             // 顯示載入動畫
             this.showLoading();
             
-            // 發送分析請求
+            // 發送分析請求（同步執行）
             const response = await fetch('/start_analysis', {
                 method: 'POST',
                 headers: {
@@ -119,71 +117,21 @@ class ThreatAnalysisSystem {
             // 更新積分顯示
             this.updateCredits(data.remaining_credits);
             
-            // 檢查是否已經完成（同步執行）
+            // 檢查分析結果
             if (data.status === 'completed' && data.result) {
-                // 直接處理完成的結果
+                // 處理完成的結果
                 this.handleAnalysisComplete(data.result);
-                
-                // 更新最終積分
-                if (data.remaining_credits !== undefined) {
-                    this.updateCredits(data.remaining_credits);
-                }
-            } else {
-                // 如果還需要檢查狀態（備用方案）
-                this.currentTask = data.task_id;
-                this.checkTaskStatus();
-            }
-            
-        } catch (error) {
-            this.hideLoading();
-            this.showError(error.message);
-        }
-    }
-
-    async checkTaskStatus() {
-        try {
-            const response = await fetch(`/get_report/${this.currentTask}`);
-            
-            // 檢查響應是否為 JSON
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/json')) {
-                throw new Error('伺服器返回非 JSON 響應，可能需要重新登入');
-            }
-            
-            const data = await response.json();
-
-            if (!response.ok) {
-                // 如果是 404 錯誤，說明報告已經在主請求中返回了
-                if (response.status === 404) {
-                    this.hideLoading();
-                    this.showError('分析系統已改為同步執行，報告應該已經顯示。如果沒有看到結果，請重新開始分析。');
-                    return;
-                }
-                throw new Error(data.error || '獲取報告失敗');
-            }
-
-            // 更新進度
-            this.updateProgress(data.progress);
-
-            if (data.status === 'completed') {
-                this.handleAnalysisComplete(data.result);
-                // 更新積分顯示
-                if (data.final_credits !== undefined) {
-                    this.updateCredits(data.final_credits);
-                }
             } else if (data.status === 'error') {
                 throw new Error(data.error || '分析過程發生錯誤');
             } else {
-                // 如果還在進行中，繼續檢查
-                setTimeout(() => this.checkTaskStatus(), 1000);
+                throw new Error('分析結果格式異常');
             }
-
+            
         } catch (error) {
             this.hideLoading();
             this.showError(error.message);
         }
     }
-
 
     handleAnalysisComplete(result) {
         this.hideLoading();

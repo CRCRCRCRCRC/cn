@@ -75,9 +75,8 @@ class User(UserMixin):
             # 沒有 request context 時忽略
             pass
 
-# 全域變量存儲用戶和任務
+# 全域變量存儲用戶
 users = {}
-tasks = {}
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -232,114 +231,62 @@ def start_analysis():
         
         cost = AI_MODELS[model]
         
-        # 檢查積分（但先不扣除）
+        # 檢查積分
         if not current_user.is_dev and current_user.credits < cost:
             return jsonify({'error': '積分不足'}), 400
         
-        # 創建任務
-        task_id = f"task_{int(time.time())}"
-        tasks[task_id] = {
-            'status': 'running',
-            'progress': 0,
-            'result': None,
-            'error': None,
-            'user_id': current_user.id,
-            'model': model,
-            'cost': cost,
-            'credits_deducted': False
-        }
-        
-        # 在 Serverless 環境中直接執行，不使用背景線程
-        # 因為 Vercel 的 Serverless 函數有時間限制，我們改為同步執行
+        # 在 Serverless 環境中直接同步執行分析
         try:
-            run_analysis_sync(task_id, model, current_user.id)
+            print("開始收集資料...")
+            # 收集資料
+            data = collect_all_data_sync()
+            print("資料收集完成，開始計算威脅指標...")
+            
+            # 計算威脅指標
+            indicators = calculate_threat_indicators(data)
+            print("威脅指標計算完成，開始生成AI報告...")
+            
+            # 生成AI報告
+            report = generate_ai_report(data, indicators, model)
+            print("AI報告生成完成")
+            
+            # 扣除積分
+            if not current_user.is_dev:
+                current_user.deduct_credits(cost)
+                print(f"積分已扣除: {cost}, 剩餘: {current_user.credits}")
+            
+            # 更新 session 中的積分
+            current_user.update_session_credits()
+            
+            # 直接返回結果
+            result = {
+                'status': 'completed',
+                'progress': 100,
+                'result': {
+                    'indicators': indicators,
+                    'report': report,
+                    'timestamp': datetime.now().isoformat()
+                },
+                'remaining_credits': current_user.credits
+            }
+            
+            return jsonify(result)
+            
         except Exception as e:
             import traceback
-            error_details = f"錯誤: {str(e)}\n追蹤: {traceback.format_exc()}"
-            tasks[task_id]['status'] = 'error'
-            tasks[task_id]['error'] = error_details
-            print(f"分析執行錯誤: {error_details}")  # 用於調試
-        
-        # 確保返回最新的積分數
-        current_user.update_session_credits()
-        
-        return jsonify({'task_id': task_id, 'remaining_credits': current_user.credits})
+            error_details = f"分析執行錯誤: {str(e)}"
+            print(f"錯誤詳情: {error_details}")
+            print(f"追蹤: {traceback.format_exc()}")
+            return jsonify({
+                'status': 'error',
+                'error': error_details,
+                'remaining_credits': current_user.credits
+            }), 500
     
     except Exception as e:
         return jsonify({'error': f'分析啟動失敗: {str(e)}'}), 500
 
-@app.route('/get_report/<task_id>')
-@login_required
-def get_report(task_id):
-    try:
-        task = tasks.get(task_id)
-        if not task or task['user_id'] != current_user.id:
-            return jsonify({'error': '任務不存在'}), 404
-        
-        # 如果任務完成且積分已扣除，更新當前用戶的積分
-        if (task.get('status') == 'completed' and 
-            task.get('credits_deducted') and 
-            'final_credits' in task):
-            current_user.credits = task['final_credits']
-            current_user.update_session_credits()
-        
-        return jsonify(task)
-    
-    except Exception as e:
-        return jsonify({'error': f'獲取報告失敗: {str(e)}'}), 500
-
-def run_analysis_sync(task_id, model, user_id):
-    """同步執行分析任務（適用於 Serverless 環境）"""
-    try:
-        print(f"開始分析任務 {task_id}")
-        
-        # 更新進度
-        tasks[task_id]['progress'] = 10
-        print("進度: 10% - 開始收集資料")
-        
-        # 收集資料
-        data = collect_all_data_sync()
-        tasks[task_id]['progress'] = 40
-        print("進度: 40% - 資料收集完成")
-        
-        # 計算威脅指標
-        indicators = calculate_threat_indicators(data)
-        tasks[task_id]['progress'] = 70
-        print("進度: 70% - 威脅指標計算完成")
-        
-        # 生成AI報告
-        report = generate_ai_report(data, indicators, model)
-        tasks[task_id]['progress'] = 100
-        print("進度: 100% - AI報告生成完成")
-        
-        # 任務成功完成，現在才扣除積分
-        user = users.get(user_id)
-        if user and not user.is_dev:
-            cost = tasks[task_id]['cost']
-            user.deduct_credits(cost)
-            tasks[task_id]['credits_deducted'] = True
-            tasks[task_id]['final_credits'] = user.credits
-            print(f"積分已扣除: {cost}, 剩餘: {user.credits}")
-        
-        # 完成任務
-        tasks[task_id]['status'] = 'completed'
-        tasks[task_id]['result'] = {
-            'indicators': indicators,
-            'report': report,
-            'timestamp': datetime.now().isoformat()
-        }
-        print(f"任務 {task_id} 完成")
-        
-    except Exception as e:
-        import traceback
-        error_msg = f"任務執行錯誤: {str(e)}"
-        traceback_msg = traceback.format_exc()
-        print(f"{error_msg}\n{traceback_msg}")
-        
-        tasks[task_id]['status'] = 'error'
-        tasks[task_id]['error'] = error_msg
-        # 任務失敗，不扣除積分
-        raise e  # 重新拋出異常以便上層處理
+# get_report 路由已移除，因為改為同步處理，直接在 start_analysis 中返回結果
 
 # Vercel 需要的應用實例
 application = app
