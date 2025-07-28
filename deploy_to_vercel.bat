@@ -1,4 +1,5 @@
 @echo off
+set PATH=%PATH%;C:\Users\howar\AppData\Roaming\npm
 echo 開始部署到 Vercel...
 echo.
 
