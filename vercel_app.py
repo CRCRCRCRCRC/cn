@@ -125,10 +125,14 @@ class User(UserMixin):
     def update_session_credits(self):
         """安全地更新 session 中的積分"""
         try:
-            if has_request_context() and 'user_data' in session:
-                session['user_data']['credits'] = self.credits
-                session.modified = True
-        except:
+            # 檢查是否在請求上下文中
+            if has_request_context():
+                if 'user_data' in session:
+                    session['user_data']['credits'] = self.credits
+                    session.modified = True
+        except Exception as e:
+            # 在 Serverless 環境中，可能會有上下文問題，靜默處理
+            print(f"Session update warning: {e}")
             pass
 
 # 全域變量存儲用戶
@@ -137,18 +141,22 @@ users = {}
 @login_manager.user_loader
 def load_user(user_id):
     # 在 Serverless 環境中，先嘗試從 session 恢復用戶
-    if user_id not in users and 'user_data' in session:
-        user_data = session['user_data']
-        if user_data['id'] == user_id:
-            user = User(
-                user_data['id'],
-                user_data['email'],
-                user_data['name'],
-                user_data['picture'],
-                user_data.get('is_dev', False)
-            )
-            user.credits = user_data.get('credits', user.credits)
-            users[user_id] = user
+    try:
+        if user_id not in users and has_request_context() and 'user_data' in session:
+            user_data = session['user_data']
+            if user_data['id'] == user_id:
+                user = User(
+                    user_data['id'],
+                    user_data['email'],
+                    user_data['name'],
+                    user_data['picture'],
+                    user_data.get('is_dev', False)
+                )
+                user.credits = user_data.get('credits', user.credits)
+                users[user_id] = user
+    except Exception as e:
+        print(f"User loading warning: {e}")
+        pass
     
     return users.get(user_id)
 
