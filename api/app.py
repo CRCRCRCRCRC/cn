@@ -67,11 +67,11 @@ class User(UserMixin):
     def update_session_credits(self):
         """更新 session 中的積分（只在有 request context 時調用）"""
         try:
-            from flask import session
-            if 'user_data' in session:
+            from flask import has_request_context, session
+            if has_request_context() and 'user_data' in session:
                 session['user_data']['credits'] = self.credits
                 session.modified = True
-        except RuntimeError:
+        except (RuntimeError, ImportError):
             # 沒有 request context 時忽略
             pass
 
@@ -254,8 +254,11 @@ def start_analysis():
         try:
             run_analysis_sync(task_id, model, current_user.id)
         except Exception as e:
+            import traceback
+            error_details = f"錯誤: {str(e)}\n追蹤: {traceback.format_exc()}"
             tasks[task_id]['status'] = 'error'
-            tasks[task_id]['error'] = str(e)
+            tasks[task_id]['error'] = error_details
+            print(f"分析執行錯誤: {error_details}")  # 用於調試
         
         # 確保返回最新的積分數
         current_user.update_session_credits()
@@ -288,20 +291,26 @@ def get_report(task_id):
 def run_analysis_sync(task_id, model, user_id):
     """同步執行分析任務（適用於 Serverless 環境）"""
     try:
+        print(f"開始分析任務 {task_id}")
+        
         # 更新進度
         tasks[task_id]['progress'] = 10
+        print("進度: 10% - 開始收集資料")
         
         # 收集資料
         data = collect_all_data_sync()
         tasks[task_id]['progress'] = 40
+        print("進度: 40% - 資料收集完成")
         
         # 計算威脅指標
         indicators = calculate_threat_indicators(data)
         tasks[task_id]['progress'] = 70
+        print("進度: 70% - 威脅指標計算完成")
         
         # 生成AI報告
         report = generate_ai_report(data, indicators, model)
         tasks[task_id]['progress'] = 100
+        print("進度: 100% - AI報告生成完成")
         
         # 任務成功完成，現在才扣除積分
         user = users.get(user_id)
@@ -310,6 +319,7 @@ def run_analysis_sync(task_id, model, user_id):
             user.deduct_credits(cost)
             tasks[task_id]['credits_deducted'] = True
             tasks[task_id]['final_credits'] = user.credits
+            print(f"積分已扣除: {cost}, 剩餘: {user.credits}")
         
         # 完成任務
         tasks[task_id]['status'] = 'completed'
@@ -318,10 +328,16 @@ def run_analysis_sync(task_id, model, user_id):
             'report': report,
             'timestamp': datetime.now().isoformat()
         }
+        print(f"任務 {task_id} 完成")
         
     except Exception as e:
+        import traceback
+        error_msg = f"任務執行錯誤: {str(e)}"
+        traceback_msg = traceback.format_exc()
+        print(f"{error_msg}\n{traceback_msg}")
+        
         tasks[task_id]['status'] = 'error'
-        tasks[task_id]['error'] = str(e)
+        tasks[task_id]['error'] = error_msg
         # 任務失敗，不扣除積分
         raise e  # 重新拋出異常以便上層處理
 
