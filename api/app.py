@@ -38,7 +38,7 @@ login_manager.login_view = 'login'
 # 自定義未授權處理器，返回 JSON 而不是重定向
 @login_manager.unauthorized_handler
 def unauthorized():
-    if request.is_json or request.path.startswith('/start_analysis') or request.path.startswith('/get_report'):
+    if request.is_json or request.path.startswith('/start_analysis'):
         return jsonify({'error': '請先登入系統'}), 401
     return redirect(url_for('login'))
 

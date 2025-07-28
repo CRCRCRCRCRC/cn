@@ -1,4 +1,11 @@
 // 台灣防衛情勢感知系統 - 主要JavaScript文件
+// 版本: 2.1 - 同步處理版本 (2025-07-28 15:30)
+// 注意：此版本已移除所有異步任務輪詢，改為同步處理
+// 部署時間戳: 20250728153000
+
+console.log('Taiwan Defense System v2.1 - Synchronous Processing Version Loaded - Deploy: 20250728153000');
+console.log('✅ 已移除所有 get_report 和輪詢邏輯');
+console.log('✅ 改為同步處理威脅分析');
 
 class ThreatAnalysisSystem {
     constructor() {
