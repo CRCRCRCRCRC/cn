@@ -141,6 +141,9 @@ class ThreatAnalysisSystem {
     }
 
     handleAnalysisComplete(result) {
+        console.log('分析完成，結果:', result);
+        
+        // 隱藏載入動畫
         this.hideLoading();
         
         // 顯示儀表板
@@ -148,6 +151,9 @@ class ThreatAnalysisSystem {
         
         // 更新威脅指標
         this.updateThreatIndicators(result.indicators);
+        
+        // 更新經濟數據
+        this.updateEconomicData(result.data);
         
         // 顯示AI報告
         this.showReport(result.report);
@@ -234,6 +240,82 @@ class ThreatAnalysisSystem {
                 }, index * 200); // 錯開動畫時間
             }
         });
+    }
+
+    updateEconomicData(data) {
+        console.log('更新經濟數據:', data);
+        
+        if (data && data.economic) {
+            const economic = data.economic;
+            
+            // 更新黃金價格
+            if (economic.gold_price) {
+                const goldElement = document.getElementById('gold-price');
+                if (goldElement) {
+                    const price = economic.gold_price.price || economic.gold_price;
+                    this.animateEconomicValue(goldElement, price, '$');
+                }
+            }
+            
+            // 更新小麥價格
+            if (economic.wheat_price) {
+                const wheatElement = document.getElementById('wheat-price');
+                if (wheatElement) {
+                    const price = economic.wheat_price.price || economic.wheat_price;
+                    this.animateEconomicValue(wheatElement, price, '$');
+                }
+            }
+            
+            // 更新經濟壓力指數
+            const pressureElement = document.getElementById('economic-pressure');
+            if (pressureElement) {
+                // 基於經濟數據計算壓力指數
+                let pressureScore = 75; // 基礎分數
+                
+                if (economic.gold_price && economic.gold_price.price) {
+                    // 黃金價格越高，經濟壓力越大
+                    if (economic.gold_price.price > 2000) pressureScore += 10;
+                    if (economic.gold_price.price > 2100) pressureScore += 5;
+                }
+                
+                if (economic.wheat_price && economic.wheat_price.price) {
+                    // 小麥價格越高，經濟壓力越大
+                    if (economic.wheat_price.price > 600) pressureScore += 8;
+                    if (economic.wheat_price.price > 700) pressureScore += 7;
+                }
+                
+                // 限制在合理範圍內
+                pressureScore = Math.min(100, Math.max(50, pressureScore));
+                
+                this.animateEconomicValue(pressureElement, pressureScore, '', '/100');
+            }
+        }
+    }
+
+    animateEconomicValue(element, targetValue, prefix = '', suffix = '') {
+        // 添加更新動畫效果
+        const card = element.closest('.economic-card');
+        if (card) {
+            card.classList.add('updating');
+            setTimeout(() => {
+                card.classList.remove('updating');
+            }, 2000);
+        }
+        
+        let currentValue = 0;
+        const increment = targetValue / 50;
+        
+        const animation = setInterval(() => {
+            currentValue += increment;
+            if (currentValue >= targetValue) {
+                currentValue = targetValue;
+                clearInterval(animation);
+            }
+            
+            const displayValue = typeof currentValue === 'number' ? 
+                currentValue.toFixed(currentValue < 10 ? 1 : 0) : currentValue;
+            element.textContent = `${prefix}${displayValue}${suffix}`;
+        }, 40);
     }
 
     animateNumber(element, targetValue) {

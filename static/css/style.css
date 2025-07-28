@@ -757,3 +757,142 @@ h1, h2, h3 {
         font-size: 2rem;
     }
 }
+
+/* 經濟指標樣式 */
+.economic-indicators {
+    margin-top: 30px;
+    padding: 25px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(0, 255, 255, 0.3);
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+}
+
+.economic-indicators h3 {
+    color: var(--primary-color);
+    margin-bottom: 20px;
+    text-align: center;
+    font-size: 1.3rem;
+    text-shadow: 0 0 10px var(--primary-color);
+}
+
+.economic-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.economic-card {
+    background: linear-gradient(135deg, rgba(0, 255, 255, 0.05), rgba(0, 255, 255, 0.1));
+    border: 1px solid rgba(0, 255, 255, 0.3);
+    border-radius: 10px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.economic-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(0, 255, 255, 0.1), transparent);
+    transition: left 0.5s ease;
+}
+
+.economic-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 30px rgba(0, 255, 255, 0.2);
+    border-color: var(--primary-color);
+}
+
+.economic-card:hover::before {
+    left: 100%;
+}
+
+.economic-icon {
+    width: 50px;
+    height: 50px;
+    background: linear-gradient(45deg, var(--primary-color), #00cccc);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+}
+
+.economic-icon i {
+    font-size: 1.5rem;
+    color: var(--bg-dark);
+}
+
+.economic-info {
+    flex: 1;
+}
+
+.economic-label {
+    font-size: 0.9rem;
+    color: var(--text-dim);
+    margin-bottom: 5px;
+    font-weight: 500;
+}
+
+.economic-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-bottom: 3px;
+    font-family: 'Orbitron', monospace;
+    text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+}
+
+.economic-unit {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    opacity: 0.8;
+}
+
+/* 經濟指標動畫 */
+@keyframes economicPulse {
+    0%, 100% { 
+        box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+    }
+    50% { 
+        box-shadow: 0 0 30px rgba(0, 255, 255, 0.6);
+    }
+}
+
+.economic-card.updating .economic-icon {
+    animation: economicPulse 1.5s ease-in-out infinite;
+}
+
+/* 響應式設計 - 經濟指標 */
+@media (max-width: 768px) {
+    .economic-cards {
+        grid-template-columns: 1fr;
+    }
+    
+    .economic-card {
+        padding: 15px;
+    }
+    
+    .economic-icon {
+        width: 40px;
+        height: 40px;
+    }
+    
+    .economic-icon i {
+        font-size: 1.2rem;
+    }
+    
+    .economic-value {
+        font-size: 1.2rem;
+    }
+}

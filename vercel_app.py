@@ -197,8 +197,13 @@ def dev_auth():
             flash('此測試碼無法使用')
     return render_template('dev_auth.html')
 
-@app.route('/auth/google')
+@app.route('/google-auth')
 def google_auth():
+    # 重定向到實際的 Google OAuth 路由
+    return redirect(url_for('google_auth_real'))
+
+@app.route('/auth/google')
+def google_auth_real():
     # Google OAuth 重定向
     params = {
         'client_id': GOOGLE_CLIENT_ID,
